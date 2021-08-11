@@ -1,0 +1,36 @@
+---
+- name: Changes ldap auth to VCS Support
+  hosts: servers
+  gather_facts: no
+  #strategy: free
+  become: yes
+  vars:    
+    sssd_string: "{{ lookup('env', 'sssd_string') }}"
+    sudoers_string: "{{ lookup('env', 'sudoers_string') }}"
+  tasks:
+    - name: Changes line in /etc/sssd/sssd.conf
+      replace:
+        path: /etc/sssd/sssd.conf
+        regexp: '^ldap_access_filter(.*)'
+        replace: 'ldap_access_filter = (|(memberOf={{ sssd_string }}))'
+        backup: yes
+      notify: restart sssd
+      
+    - name: Changes line in /etc/sudoers.d/epam
+      replace:
+        path: /etc/sudoers.d/epam
+        regexp: '^\%project\\(.*)'
+        replace: '{{ sudoers_string }} ALL=(ALL)       NOPASSWD: ALL'
+        backup: yes
+    - name: Changes user to stranger
+      shell: |
+        usermod -l stranger user
+        usermod -d /home/stranger -m stranger
+      args:
+        executable: /bin/bash    
+      
+  handlers:
+    - name: restart sssd
+      service: 
+        name: sssd 
+        state: restarted
